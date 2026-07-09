@@ -335,10 +335,11 @@ async def generate_pass(payload: MissingChildPayload, background_tasks: Backgrou
     )
     
     pdf_path = path.replace(".png", ".pdf")
-   await run_in_threadpool(
-    HTML(string=html_content, base_url=os.getcwd()).write_pdf,
-    pdf_path
-    )
+
+        await run_in_threadpool(
+            HTML(string=html_content, base_url=os.getcwd()).write_pdf,
+            pdf_path
+        )
     
     email_status = "not_requested"
     if is_valid_parent_email(payload.parent_email):
