@@ -145,7 +145,12 @@ PDF_TEMPLATE = """
 <meta charset="UTF-8">
 <style>
     body { font-family: sans-serif; padding: 25px; background: #fff; color: #222; }
-    .alert-box { border: 4px dashed #d9534f; padding: 20px; min-height: 850px; position: relative; }
+   .alert-box {
+    border: 4px dashed #d9534f;
+    padding: 20px;
+    min-height: 850px;
+    position: relative;
+    box-sizing: border-box; }
     .banner { background: #d9534f; color: white; padding: 12px; margin: 15px 0; font-weight: bold; text-align: center; font-size: 15px; }
     table { width: 100%; border-collapse: collapse; }
     td { vertical-align: top; }
@@ -153,7 +158,15 @@ PDF_TEMPLATE = """
     h1 { color: #d9534f; font-size: 34px; text-align: center; margin: 0 0 5px 0; font-weight: bold; }
     h4 { color: #0275d8; margin: 15px 0 8px 0; border-bottom: 2px solid #eee; padding-bottom: 3px; font-size: 16px; text-transform: uppercase; }
     .highlight-container { margin-top: 15px; border-left: 4px solid #5cb85c; padding-left: 15px; background: #f9f9f9; padding-top: 2px; padding-bottom: 2px; }
-</style>
+    @page {
+        size: Letter;
+        margin: 12mm;
+    }
+
+    body {
+        margin: 0;
+    }
+    </style>
 </head>
 <body>
     <div class="alert-box">
@@ -208,13 +221,35 @@ PDF_TEMPLATE = """
             </div>
         </div>
 
-        <div style="position: absolute; bottom: 15px; left: 20px; right: 20px; border-top: 3px solid #d9534f; padding-top: 12px; text-align: center;">
-            <p style="font-size: 14px; font-weight: bold; color: #d9534f; text-transform: uppercase; margin: 0 0 4px 0; letter-spacing: 0.5px;">
+        <div style="
+            margin-top: 22px;
+            border-top: 3px solid #d9534f;
+            padding: 12px 12px 0 12px;
+            text-align: center;
+            page-break-inside: avoid;
+        ">
+            <p style="
+                font-size: 13px;
+                font-weight: bold;
+                color: #d9534f;
+                text-transform: uppercase;
+                margin: 0 0 8px 0;
+                line-height: 1.35;
+                letter-spacing: 0.3px;
+            ">
                 IF YOU HAVE INFORMATION CONCERNING THIS CHILD, IMMEDIATELY CALL LOCAL EMERGENCY SERVICES OR THE REPORTING AGENCY NOTED ABOVE.
             </p>
-            <p style="font-size: 11px; color: #555555; line-height: 1.4; font-style: italic; margin: 0;">
-                Do not take independent action. All sightings, tips, and active coordinate updates must be reported 
-                directly to regional emergency response authorities or the <strong>reporting agency noted above</strong>.
+
+            <p style="
+                font-size: 10px;
+                color: #555555;
+                line-height: 1.45;
+                font-style: italic;
+                margin: 0;
+            ">
+                Do not take independent action. All sightings, tips, and active coordinate updates must be reported
+                directly to regional emergency response authorities or the
+                <strong>reporting agency noted above</strong>.
             </p>
         </div>
     </div>
