@@ -53,11 +53,20 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://localhost",
+        "http://localhost",
+        "capacitor://localhost",
+    ],
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-    expose_headers=["X-Email-Status"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=[
+        "Content-Type",
+        "X-SecurePass-Token",
+    ],
+    expose_headers=[
+        "X-Email-Status",
+    ],
 )
 
 @app.get("/")
