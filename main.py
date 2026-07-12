@@ -49,24 +49,14 @@ async def lifespan(app: FastAPI):
     janitor_task.cancel()
 
 app = FastAPI(title="SecurePass Enterprise Engine", lifespan=lifespan, redirect_slashes=False)
-from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://localhost",
-        "http://localhost",
-        "capacitor://localhost",
-    ],
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "OPTIONS"],
-    allow_headers=[
-        "Content-Type",
-        "X-SecurePass-Token",
-    ],
-    expose_headers=[
-        "X-Email-Status",
-    ],
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["X-Email-Status"],
 )
 
 @app.get("/")
