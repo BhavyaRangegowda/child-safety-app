@@ -176,7 +176,7 @@ PDF_TEMPLATE = """
         </div>
         <table>
             <tr>
-                <td style="width: 42%;"><img src="{{ image_path }}" style="width: 100%; max-height: 420px; object-fit: contain; border: 3px solid #d9534f;"><p><strong>Photo Context:</strong> {{ photo_context }}</p></td>
+                <td style="width: 42%;"><img src="{{ image_path }}" style="width: 100%; max-height: 420px; object-fit: contain; border: 3px solid #d9534f;"><p><strong>Photo Information:</strong> {{ photo_context }}</p></td>
                 <td style="width: 58%; padding-left: 20px;">
                     <h4>Vital Statistics</h4>
                     <p><strong>Full Name:</strong> {{ child_name }}</p>
@@ -199,7 +199,7 @@ PDF_TEMPLATE = """
         </table>
 
         <div class="highlight-container">
-            <h4>Current Attire Profile</h4>
+            <h4>Clothing When Last Seen</h4>
             <p>{{ clothing_desc }}</p>
         </div>
 
