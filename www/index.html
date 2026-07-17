@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency - Child Missing Alert</title>
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+<body>
+
+<div class="mobile-frame">
+
+    <div id="legalOverlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: white; z-index: 9999; padding: 20px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+        <h2 style="color: #d9534f;">Terms of Use & Disclaimer</h2>
+        <div style="text-align: left; font-size: 14px; color: #333; margin-bottom: 20px; height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;">
+            <p style="color: #d9534f; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                IMPORTANT: This is a personal safety utility designed to assist parents in compiling 
+                information for emergency responders. It is not an official government application.
+            </p>
+            <p><strong>1. Disclaimer:</strong> This application is a personal safety utility for organizing information. It is NOT an official government or law enforcement tool.</p>
+            <p><strong>2. Emergency Protocol:</strong> This app is NOT a substitute for calling emergency services. In any emergency, please call emergency services immediately.</p>
+            <p><strong>3. Data Privacy:</strong> Personal information is processed only for the purpose of generating the Emergency Broadcast Pass. Temporary files are encrypted and automatically removed within 24 hours. No personal information is intentionally retained beyond the processing required to generate and deliver the PDF.</p>
+            <p><strong>4. Accuracy:</strong> The user is solely responsible for the accuracy of the information provided.</p>
+            <p><strong>5. Acceptance:</strong> By tapping "Accept," you acknowledge that you are using this tool at your own risk and for personal safety purposes only.</p>
+            <p><strong>6. Privacy:</strong> Uploaded photos and generated PDFs are used only to create the Emergency Broadcast Pass. Files are deleted from the server immediately after processing and are not intentionally stored, sold, or shared.</p>        
+        </div>
+
+        <div style="display: flex; gap: 10px; justify-content: center;">
+            <button
+                id="acceptBtn"
+                type="button"
+                style="padding: 15px 30px; background: #d9534f; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                I ACCEPT
+            </button>
+            <button
+                id="cancelBtn"
+                type="button"
+                style="padding: 15px 30px; background: #6c757d; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer;">
+                EXIT APP
+            </button>
+        </div>
+    </div>
+    <div class="header-bar">Emergency - Child Missing Alert</div>
+    
+    <div class="form-container">
+        <form id="broadcastForm">
+            
+            <div class="form-group">
+                <label>Child Full Name<span class="required-asterisk">*</span></label>
+                <input type="text" id="childName" required maxlength="150" placeholder="Enter child's full name">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Age<span class="required-asterisk">*</span></label>
+                    <input type="text" id="childAge" required maxlength="50" placeholder="e.g., 8 or Eight">
+                </div>
+                <div class="form-group">
+                    <label>Gender<span class="required-asterisk">*</span></label>
+                    <select id="childGender" required>
+                        <option value="" disabled selected>Select</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Skin Tone</label>
+                    <input type="text" id="skinTone" maxlength="150" placeholder="e.g., Fair, Light, Medium">
+                </div>
+                <div class="form-group">
+                    <label>Eye Color</label>
+                    <input type="text" id="eyeColor" maxlength="150" placeholder="e.g., Brown, Blue, Hazel">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Last Seen / Missing From Location<span class="required-asterisk">*</span></label>
+                <input type="text" id="addressInput" required maxlength="255" placeholder="Type street name, city, mall, or venue..." autocomplete="off">
+                <div id="autocompleteDropdown" class="autocomplete-suggestions"></div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="form-group">
+                <label>Parent / Guardian Name<span class="required-asterisk">*</span></label>
+                <input type="text" id="parentName" required maxlength="150" placeholder="Enter parent or guardian name">
+            </div>
+            <div class="form-group">
+                <label>Reporting Law Enforcement Agency / Contact</label>
+                <input type="text" id="reportingAgency" maxlength="200" placeholder="e.g., Plano Police Dept - 911">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Primary Phone<span class="required-asterisk">*</span></label>
+                    <input type="text" id="contactPhone" required maxlength="150" placeholder="e.g., (214) 555-0199">
+                </div>
+                <div class="form-group">
+                    <label>Alternate Phone</label>
+                    <input type="text" id="altPhone" maxlength="150" placeholder="Backup phone number">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Parent Email Address</label>
+                <input type="text" id="parentEmail" maxlength="150" placeholder="guardian@example.com">
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="form-group">
+                <label>Clothing When Last Seen</label>
+                <textarea id="clothingDesc" maxlength="500" placeholder="Describe the clothes worn when the child was last seen..."></textarea>
+                <div class="field-helper">Describe the clothing worn when the child was last seen. It may be different from the clothing shown in the selected photo.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Footwear</label>
+                <input type="text" id="footwear" maxlength="150" placeholder="e.g., Red Nike shoes, white sandals">
+            </div>
+
+            <div class="form-group">
+                <label>Marks / Scars / Distinguishing Features</label>
+                <textarea id="birthmarks" maxlength="500" placeholder="e.g., Small birthmark on left arm, scar near right eyebrow..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Accessories & Electronics</label>
+                <textarea id="electronics" maxlength="500" placeholder="e.g., Carrying an iPad, wearing an Apple Watch, pink glitter backpack..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Accompanying Pets / Toys</label>
+                <textarea id="petsToys" maxlength="500" placeholder="e.g., Walking a golden retriever with a red collar, holding a plush teddy bear..."></textarea>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <div class="form-group">
+                <label>Child Photo<span class="required-asterisk">*</span></label>
+                <div class="media-actions">
+                    <button type="button" class="media-btn" id="camBtn">Take Current Photo</button>
+                    <button type="button" class="media-btn" id="galleryBtn">Choose Recent Photo</button>
+                </div>
+
+                <input type="file" id="hiddenFilePicker" accept="image/*" style="display: none;">
+                <div id="photoPreviewBox" class="preview-thumbnail">No photo captured or selected</div>
+                <div id="photoClothingWarning" class="photo-warning">⚠️ This is a reference photo. The clothing shown may not match what the child was wearing when last seen. Complete "Clothing When Last Seen" with the reported clothing description.</div>
+            </div>
+
+            <div class="form-group">
+                <label>Photo Information<span class="required-asterisk">*</span></label>
+                <select id="photoContext" required>
+                    <option value="Current photo taken today">Current photo taken today</option>
+                    <option value='Recent reference photo. See "Clothing When Last Seen" for the reported clothing description.'>Recent reference photo. See "Clothing When Last Seen" for the reported clothing description.</option>
+                </select>
+            </div>
+
+            <button type="submit" id="generateBtn" class="submit-btn">
+                Generate Broadcast Pass
+            </button>
+
+            <button type="button" id="formClearBtn" class="submit-btn" style="background:#6c757d;">Clear Form</button>
+            <button type="button" id="formBackTermsBtn" class="submit-btn" style="background:#0275d8;">Back to Terms</button>
+            <button type="button" id="formCloseBtn" class="submit-btn" style="background:#444444;">Close</button>
+            
+            <div id="statusMessage" class="status-box">Ready to submit alert pass details.</div>
+        </form>
+    </div>
+</div>
+
+<script src="app.js"></script>
+
+
+</body>
+
+</html>
