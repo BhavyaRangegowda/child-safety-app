@@ -32,7 +32,8 @@ console.log("Capacitor =", window.Capacitor);
     const autocompleteDropdown = document.getElementById('autocompleteDropdown');
     let debounceTimer;
 
-    function acceptTerms() {
+ function acceptTerms() {
+    localStorage.setItem("termsAccepted", "true");
     document.getElementById('legalOverlay').style.display = 'none';
     document.getElementById('broadcastForm').style.display = 'block';
 }
@@ -1268,9 +1269,17 @@ console.log("Capacitor =", window.Capacitor);
 
   // Handle Accept Button
     document.getElementById('acceptBtn').addEventListener('click', function() {
+        localStorage.setItem("termsAccepted", "true");
         document.getElementById('legalOverlay').style.display = 'none';
         document.getElementById('broadcastForm').style.display = 'block';
     });
 
     // Handle Exit App Button
     document.getElementById('cancelBtn').addEventListener('click', exitFromTerms);
+    if (localStorage.getItem("termsAccepted") === "true") {
+        document.getElementById('legalOverlay').style.display = 'none';
+        document.getElementById('broadcastForm').style.display = 'block';
+    } else {
+        document.getElementById('legalOverlay').style.display = 'flex';
+        document.getElementById('broadcastForm').style.display = 'none';
+    }
