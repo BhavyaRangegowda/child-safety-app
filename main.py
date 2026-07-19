@@ -745,7 +745,9 @@ async def generate_pass(payload: MissingChildPayload, background_tasks: Backgrou
     finally:
         if request_id and processing_entry_created and not completed_successfully:
             await _remove_processing_entry(request_id)
-        _cleanup_temp_paths(temp_paths)
+
+        if not completed_successfully:
+            _cleanup_temp_paths(temp_paths)
 
 if __name__ == "__main__":
     import uvicorn
