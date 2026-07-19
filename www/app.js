@@ -4,12 +4,28 @@ console.log("Capacitor =", window.Capacitor);
     console.log("FileViewer plugin =", window.Capacitor?.Plugins?.FileViewer);
     let compressedPhotoBase64 = "";
     let isSubmitting = false;
+    let isPreparingPhoto = false;
     let progressTimerOne = null;
     let progressTimerTwo = null;
     let activeRequestController = null;
     let lastSubmittedPayload = null;
     let lastSavedPdfPath = "";
     let lastSavedPdfName = "";
+    let activeSubmissionRequestId = null;
+
+    function setSubmissionControlsDisabled(isDisabled) {
+        const form = document.getElementById('broadcastForm');
+        if (!form) {
+            return;
+        }
+
+        form.querySelectorAll('input, select, textarea, button').forEach((control) => {
+            if (control.id === 'statusMessage') {
+                return;
+            }
+            control.disabled = isDisabled;
+        });
+    }
 
     let successAudioContext = null;
     const addressInput = document.getElementById('addressInput');
@@ -28,7 +44,7 @@ console.log("Capacitor =", window.Capacitor);
 
         debounceTimer = setTimeout(async () => {
             try {
-                const response = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`);
+                throw new Error('Autocomplete disabled - manual address entry is supported.');
                 const data = await response.json();
                 if (data && data.length > 0) {
                     autocompleteDropdown.innerHTML = '';
@@ -37,7 +53,7 @@ console.log("Capacitor =", window.Capacitor);
                         div.className = 'suggestion-item';
                         div.innerText = item.display_name;
                         div.addEventListener('click', function() {
-                            addressInput.value = item.display_name;
+                            addressInput.value = item.display_name.trim();
                             autocompleteDropdown.style.display = 'none';
                         });
                         autocompleteDropdown.appendChild(div);
@@ -47,7 +63,8 @@ console.log("Capacitor =", window.Capacitor);
                     autocompleteDropdown.style.display = 'none';
                 }
             } catch (err) {
-                console.error(err);
+                console.warn('Address autocomplete unavailable:', err?.message || err);
+                autocompleteDropdown.style.display = 'none';
             }
         }, 300);
     });
@@ -63,7 +80,384 @@ console.log("Capacitor =", window.Capacitor);
     const photoPreviewBox = document.getElementById('photoPreviewBox');
     const photoContextDropdown = document.getElementById('photoContext');
     const photoClothingWarning = document.getElementById('photoClothingWarning');
-        camBtn.addEventListener('click', async () => {
+    const contactPhoneInput = document.getElementById('contactPhone');
+    const altPhoneInput = document.getElementById('altPhone');
+    const parentEmailInput = document.getElementById('parentEmail');
+    const contactPhoneError = document.getElementById('contactPhoneError');
+    const altPhoneError = document.getElementById('altPhoneError');
+    const parentEmailError = document.getElementById('parentEmailError');
+    const dateLastSeenInput = document.getElementById('dateLastSeen');
+    const timeLastSeenInput = document.getElementById('timeLastSeen');
+    const dateLastSeenError = document.getElementById('dateLastSeenError');
+    const timeLastSeenError = document.getElementById('timeLastSeenError');
+
+    function getLocalDateValue(date = new Date()) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    function setDateInputMax() {
+        if (dateLastSeenInput) {
+            dateLastSeenInput.max = getLocalDateValue();
+        }
+    }
+
+    setDateInputMax();
+
+    function setStatusMessage(message, isError = false) {
+        const statusBox = document.getElementById('statusMessage');
+        if (!statusBox) {
+            return;
+        }
+
+        statusBox.style.color = isError ? '#d9534f' : '#666';
+        statusBox.innerText = message;
+    }
+
+    function dataUrlToBlob(dataUrl) {
+        return new Promise((resolve, reject) => {
+            try {
+                const parts = dataUrl.split(',');
+                if (parts.length < 2) {
+                    reject(new Error('Photo data is missing.'));
+                    return;
+                }
+
+                const metadata = parts[0];
+                const base64Data = parts[1];
+                const mimeMatch = metadata.match(/data:(.*?);/);
+                const mimeType = mimeMatch && mimeMatch[1] ? mimeMatch[1] : 'image/jpeg';
+                const binary = window.atob(base64Data);
+                const bytes = new Uint8Array(binary.length);
+
+                for (let index = 0; index < binary.length; index += 1) {
+                    bytes[index] = binary.charCodeAt(index);
+                }
+
+                resolve(new Blob([bytes], { type: mimeType }));
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
+
+    async function canvasToDataUrl(canvas, mimeType, quality) {
+        return new Promise((resolve, reject) => {
+            if (typeof canvas.toBlob === 'function') {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('Photo processing failed.'));
+                        return;
+                    }
+
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        if (typeof reader.result === 'string') {
+                            resolve(reader.result);
+                        } else {
+                            reject(new Error('Photo data could not be prepared.'));
+                        }
+                    };
+                    reader.onerror = () => reject(new Error('Photo data could not be prepared.'));
+                    reader.readAsDataURL(blob);
+                }, mimeType, quality);
+                return;
+            }
+
+            resolve(canvas.toDataURL(mimeType, quality));
+        });
+    }
+
+    async function optimizePhotoDataUrl(dataUrl) {
+        if (!dataUrl || !dataUrl.startsWith('data:image')) {
+            throw new Error('Photo data is missing.');
+        }
+
+        const sourceBlob = await dataUrlToBlob(dataUrl);
+        const sourceBitmap = typeof window.createImageBitmap === 'function'
+            ? await window.createImageBitmap(sourceBlob)
+            : await new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error('Photo could not be loaded.'));
+                image.src = dataUrl;
+            });
+
+        const maxLongEdge = 2000;
+        const originalMaxDimension = Math.max(sourceBitmap.width || 0, sourceBitmap.height || 0);
+        const scale = originalMaxDimension > maxLongEdge ? maxLongEdge / originalMaxDimension : 1;
+        let targetWidth = Math.max(1, Math.round((sourceBitmap.width || 1) * scale));
+        let targetHeight = Math.max(1, Math.round((sourceBitmap.height || 1) * scale));
+        const qualitySteps = [0.85, 0.75, 0.65];
+        const sizeSteps = [1, 0.9, 0.8];
+
+        for (let attempt = 0; attempt < qualitySteps.length; attempt += 1) {
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(targetWidth));
+            canvas.height = Math.max(1, Math.round(targetHeight));
+            const context = canvas.getContext('2d');
+
+            if (!context) {
+                throw new Error('Photo processing canvas is unavailable.');
+            }
+
+            context.drawImage(sourceBitmap, 0, 0, canvas.width, canvas.height);
+            const optimizedDataUrl = await canvasToDataUrl(canvas, 'image/jpeg', qualitySteps[attempt]);
+            const outputBytes = window.atob(optimizedDataUrl.split(',')[1] || '');
+
+            if (outputBytes.length <= 1.5 * 1024 * 1024) {
+                return optimizedDataUrl;
+            }
+
+            const adjustment = sizeSteps[Math.min(attempt, sizeSteps.length - 1)];
+            targetWidth = Math.max(1, Math.round(targetWidth * adjustment));
+            targetHeight = Math.max(1, Math.round(targetHeight * adjustment));
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(targetWidth));
+        canvas.height = Math.max(1, Math.round(targetHeight));
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+            throw new Error('Photo processing canvas is unavailable.');
+        }
+
+        context.drawImage(sourceBitmap, 0, 0, canvas.width, canvas.height);
+        return canvasToDataUrl(canvas, 'image/jpeg', 0.65);
+    }
+
+    async function prepareSelectedPhoto(dataUrl, contextValue, showClothingWarning) {
+        if (!dataUrl) {
+            return;
+        }
+
+        setStatusMessage('Preparing photo...');
+        photoPreviewBox.innerText = '';
+        photoPreviewBox.style.backgroundImage = `url(${dataUrl})`;
+        photoPreviewBox.style.borderColor = '#5cb85c';
+
+        photoContextDropdown.disabled = false;
+        photoContextDropdown.value = contextValue;
+        photoContextDropdown.disabled = true;
+
+        if (photoClothingWarning) {
+            photoClothingWarning.classList.toggle('visible', showClothingWarning);
+        }
+
+        isPreparingPhoto = true;
+
+        try {
+            const optimizedDataUrl = await optimizePhotoDataUrl(dataUrl);
+            compressedPhotoBase64 = optimizedDataUrl;
+            setStatusMessage('Ready to submit alert pass details.');
+        } catch (error) {
+            console.warn('Photo optimization unavailable:', error?.message || error);
+            compressedPhotoBase64 = dataUrl;
+            setStatusMessage('The selected photo could not be processed. Please take a new photo or choose another photo.', true);
+        } finally {
+            isPreparingPhoto = false;
+        }
+    }
+
+    function clearValidationMessage(input, messageElement) {
+        if (input) {
+            input.classList.remove('input-invalid');
+        }
+        if (messageElement) {
+            messageElement.textContent = '';
+            messageElement.classList.remove('visible');
+        }
+    }
+
+    function clearAllValidationMessages() {
+        clearValidationMessage(contactPhoneInput, contactPhoneError);
+        clearValidationMessage(altPhoneInput, altPhoneError);
+        clearValidationMessage(parentEmailInput, parentEmailError);
+        clearValidationMessage(dateLastSeenInput, dateLastSeenError);
+        clearValidationMessage(timeLastSeenInput, timeLastSeenError);
+    }
+
+    function validateDateTimeFields() {
+        const dateValue = dateLastSeenInput ? dateLastSeenInput.value.trim() : '';
+        const timeValue = timeLastSeenInput ? timeLastSeenInput.value.trim() : '';
+
+        if (!dateValue) {
+            return true;
+        }
+
+        const todayValue = getLocalDateValue();
+        if (dateValue > todayValue) {
+            if (dateLastSeenInput) {
+                dateLastSeenInput.classList.add('input-invalid');
+            }
+            if (dateLastSeenError) {
+                dateLastSeenError.textContent = 'Date last seen cannot be in the future.';
+                dateLastSeenError.classList.add('visible');
+            }
+            if (dateLastSeenInput) {
+                dateLastSeenInput.focus();
+            }
+            if (typeof window !== 'undefined') {
+                window.scrollTo({ top: dateLastSeenInput ? dateLastSeenInput.getBoundingClientRect().top + window.scrollY - 20 : 0, behavior: 'smooth' });
+            }
+            return false;
+        }
+
+        if (dateValue === todayValue && timeValue) {
+            const now = new Date();
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const [hours, minutes] = timeValue.split(':').map(Number);
+            const selectedMinutes = (hours || 0) * 60 + (minutes || 0);
+
+            if (selectedMinutes > currentMinutes) {
+                if (timeLastSeenInput) {
+                    timeLastSeenInput.classList.add('input-invalid');
+                }
+                if (timeLastSeenError) {
+                    timeLastSeenError.textContent = 'Time last seen cannot be later than the current time.';
+                    timeLastSeenError.classList.add('visible');
+                }
+                if (timeLastSeenInput) {
+                    timeLastSeenInput.focus();
+                }
+                if (typeof window !== 'undefined') {
+                    window.scrollTo({ top: timeLastSeenInput ? timeLastSeenInput.getBoundingClientRect().top + window.scrollY - 20 : 0, behavior: 'smooth' });
+                }
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    function validatePhoneValue(value, message, isRequired) {
+        if (!value || !value.trim()) {
+            return isRequired ? { valid: false, message } : { valid: true };
+        }
+
+        const trimmedValue = value.trim();
+        const digitsOnly = trimmedValue.replace(/\D/g, '');
+        const hasSupportedCharacters = /^[\d\s+().-]+$/.test(trimmedValue);
+        const hasValidDigitCount = digitsOnly.length >= 6 && digitsOnly.length <= 15;
+        const hasUnsupportedChars = !hasSupportedCharacters || !hasValidDigitCount;
+
+        if (hasUnsupportedChars) {
+            return { valid: false, message };
+        }
+
+        return { valid: true };
+    }
+
+    function validateEmailValue(value) {
+        if (!value || !value.trim()) {
+            return { valid: true };
+        }
+
+        const trimmedValue = value.trim();
+        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailPattern.test(trimmedValue)) {
+            return { valid: false, message: 'Enter a valid email address.' };
+        }
+
+        return { valid: true };
+    }
+
+    function validateContactFields() {
+        const contactPhoneValue = contactPhoneInput ? contactPhoneInput.value.trim() : '';
+        const altPhoneValue = altPhoneInput ? altPhoneInput.value.trim() : '';
+        const parentEmailValue = parentEmailInput ? parentEmailInput.value.trim() : '';
+
+        const primaryPhoneValidation = validatePhoneValue(contactPhoneValue, 'Enter a valid phone number containing 6 to 15 digits.', true);
+        if (!primaryPhoneValidation.valid) {
+            if (contactPhoneInput) {
+                contactPhoneInput.classList.add('input-invalid');
+            }
+            if (contactPhoneError) {
+                contactPhoneError.textContent = primaryPhoneValidation.message;
+                contactPhoneError.classList.add('visible');
+            }
+            if (contactPhoneInput) {
+                contactPhoneInput.focus();
+            }
+            if (typeof window !== 'undefined') {
+                window.scrollTo({ top: contactPhoneInput ? contactPhoneInput.getBoundingClientRect().top + window.scrollY - 20 : 0, behavior: 'smooth' });
+            }
+            return false;
+        }
+
+        const altPhoneValidation = { valid: true };
+        if (!altPhoneValidation.valid) {
+            if (altPhoneInput) {
+                altPhoneInput.classList.add('input-invalid');
+            }
+            if (altPhoneError) {
+                altPhoneError.textContent = altPhoneValidation.message;
+                altPhoneError.classList.add('visible');
+            }
+            if (altPhoneInput) {
+                altPhoneInput.focus();
+            }
+            if (typeof window !== 'undefined') {
+                window.scrollTo({ top: altPhoneInput ? altPhoneInput.getBoundingClientRect().top + window.scrollY - 20 : 0, behavior: 'smooth' });
+            }
+            return false;
+        }
+
+        const emailValidation = validateEmailValue(parentEmailValue);
+        if (!emailValidation.valid) {
+            if (parentEmailInput) {
+                parentEmailInput.classList.add('input-invalid');
+            }
+            if (parentEmailError) {
+                parentEmailError.textContent = emailValidation.message;
+                parentEmailError.classList.add('visible');
+            }
+            if (parentEmailInput) {
+                parentEmailInput.focus();
+            }
+            if (typeof window !== 'undefined') {
+                window.scrollTo({ top: parentEmailInput ? parentEmailInput.getBoundingClientRect().top + window.scrollY - 20 : 0, behavior: 'smooth' });
+            }
+            return false;
+        }
+
+        return true;
+    }
+
+    [contactPhoneInput, altPhoneInput, parentEmailInput].forEach((input) => {
+        if (!input) {
+            return;
+        }
+
+        input.addEventListener('input', () => {
+            const errorElement = input.id === 'contactPhone'
+                ? contactPhoneError
+                : input.id === 'altPhone'
+                    ? altPhoneError
+                    : parentEmailError;
+
+            clearValidationMessage(input, errorElement);
+        });
+    });
+
+    [dateLastSeenInput, timeLastSeenInput].forEach((input) => {
+        if (!input) {
+            return;
+        }
+
+        input.addEventListener('input', () => {
+            const errorElement = input.id === 'dateLastSeen'
+                ? dateLastSeenError
+                : timeLastSeenError;
+
+            clearValidationMessage(input, errorElement);
+        });
+    });
+
+    camBtn.addEventListener('click', async () => {
     try {
         const Camera = window.Capacitor.Plugins.Camera;
 
@@ -74,19 +468,7 @@ console.log("Capacitor =", window.Capacitor);
             source: 'CAMERA'
         });
 
-        compressedPhotoBase64 = image.dataUrl;
-
-        photoPreviewBox.innerText = "";
-        photoPreviewBox.style.backgroundImage = `url(${compressedPhotoBase64})`;
-        photoPreviewBox.style.borderColor = "#5cb85c";
-
-        photoContextDropdown.disabled = false;
-        photoContextDropdown.value = "Current photo taken today";
-        photoContextDropdown.disabled = true;
-
-        if (photoClothingWarning) {
-            photoClothingWarning.classList.remove('visible');
-        }
+        await prepareSelectedPhoto(image.dataUrl, 'Current photo taken today', false);
 
     } catch (err) {
         console.error(err);
@@ -111,19 +493,7 @@ console.log("Capacitor =", window.Capacitor);
             source: 'PHOTOS'
         });
 
-        compressedPhotoBase64 = image.dataUrl;
-
-        photoPreviewBox.innerText = "";
-        photoPreviewBox.style.backgroundImage = `url(${compressedPhotoBase64})`;
-        photoPreviewBox.style.borderColor = "#5cb85c";
-
-        photoContextDropdown.disabled = false;
-        photoContextDropdown.value = 'Recent reference photo. See "Clothing When Last Seen" for the reported clothing description.';
-        photoContextDropdown.disabled = true;
-
-        if (photoClothingWarning) {
-            photoClothingWarning.classList.add('visible');
-        }
+        await prepareSelectedPhoto(image.dataUrl, 'Recent reference photo. See "Clothing When Last Seen" for the reported clothing description.', true);
 
     } catch (err) {
         console.error(err);
@@ -386,16 +756,47 @@ console.log("Capacitor =", window.Capacitor);
             const statusBox = document.getElementById('statusMessage');
             const generateBtn = document.getElementById('generateBtn');
 
+            const trimmedContactPhone = contactPhoneInput ? contactPhoneInput.value.trim() : '';
+            const trimmedAltPhone = altPhoneInput ? altPhoneInput.value.trim() : '';
+            const trimmedParentEmail = parentEmailInput ? parentEmailInput.value.trim() : '';
+
+            if (contactPhoneInput) {
+                contactPhoneInput.value = trimmedContactPhone;
+            }
+            if (altPhoneInput) {
+                altPhoneInput.value = trimmedAltPhone;
+            }
+            if (parentEmailInput) {
+                parentEmailInput.value = trimmedParentEmail;
+            }
+
+            clearAllValidationMessages();
+            setDateInputMax();
+
+            if (!validateContactFields()) {
+                return;
+            }
+
+            if (!validateDateTimeFields()) {
+                return;
+            }
+
             // Prevent duplicate submissions
             if (isSubmitting) {
                 return;
             }
-        if (!compressedPhotoBase64) {
+            if (isPreparingPhoto) {
+                setStatusMessage('Preparing photo...');
+                return;
+            }
+
+            if (!compressedPhotoBase64) {
             statusBox.style.color = '#d9534f';
             statusBox.innerText = "Error: Please capture or select a Child Photo first.";
             return;
         }
         isSubmitting = true;
+        setSubmissionControlsDisabled(true);
         generateBtn.disabled = true;
         generateBtn.innerHTML =
             '<span class="loading-spinner"></span>Generating Broadcast...';
@@ -430,6 +831,16 @@ console.log("Capacitor =", window.Capacitor);
         progressTimerTwo = setTimeout(() => {
             showProgressStage(3);
         }, 3500);
+        const requestId = activeSubmissionRequestId || (
+            (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                ? crypto.randomUUID()
+                : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+        );
+
+        if (!activeSubmissionRequestId) {
+            activeSubmissionRequestId = requestId;
+        }
+
         const payload = {
                 child_name: document.getElementById('childName').value,
                 age_gender: `${document.getElementById('childAge').value} / ${document.getElementById('childGender').value}`,
@@ -438,7 +849,9 @@ console.log("Capacitor =", window.Capacitor);
                 phone: document.getElementById('contactPhone').value,
                 alt_phone: document.getElementById('altPhone').value || "None designated",
                 parent_email: document.getElementById('parentEmail').value || "None provided",
-                full_address: document.getElementById('addressInput').value,
+                full_address: document.getElementById('addressInput').value.trim(),
+                date_last_seen: document.getElementById('dateLastSeen').value,
+                time_last_seen: document.getElementById('timeLastSeen').value,
                 shoes: document.getElementById('footwear').value || "Not provided",
                 skin_tone: document.getElementById('skinTone').value || "Not provided",
                 eye_color: document.getElementById('eyeColor').value || "Not provided",
@@ -459,7 +872,6 @@ console.log("Capacitor =", window.Capacitor);
             photoContextDropdown.disabled = false;
  
             console.log("Calling backend...");
-            console.log(JSON.stringify(payload));
             const payloadSizeKB = Math.round(
                 new Blob([JSON.stringify(payload)]).size / 1024
             );
@@ -474,6 +886,7 @@ console.log("Capacitor =", window.Capacitor);
             );
 
             let response;
+            let shouldRestoreControls = true;
 
             try {
                 response = await fetch(
@@ -482,7 +895,8 @@ console.log("Capacitor =", window.Capacitor);
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'X-SecurePass-Token': 'SP_ENTERPRISE_NATIVE_SECRET_TOKEN_XYZ123'
+                            'X-SecurePass-Token': 'EfoGJHO-uS8j6b70hl-OfKbNXNcnNwq4ZLsGSB6736zq78c5FIzbvmuIDUaVGSzD',
+                            'X-Request-ID': requestId                            //SP_ENTERPRISE_NATIVE_SECRET_TKEN_XYZ123
                         },
                         body: JSON.stringify(payload),
                         signal: activeRequestController.signal
@@ -491,6 +905,12 @@ console.log("Capacitor =", window.Capacitor);
             } finally {
                 clearTimeout(requestTimeout);
                 activeRequestController = null;
+                if (shouldRestoreControls) {
+                    setSubmissionControlsDisabled(false);
+                    if (generateBtn && generateBtn.innerText !== 'Broadcast Created ✓') {
+                        generateBtn.innerText = 'Generate Broadcast Pass';
+                    }
+                }
             }
 
             console.log("Response received");
@@ -498,8 +918,22 @@ console.log("Capacitor =", window.Capacitor);
             // Re-lock dropdown view state back to disabled rule immediately following network handoff
             photoContextDropdown.disabled = true;
 
+            if (response.status === 409) {
+                shouldRestoreControls = false;
+                isSubmitting = false;
+                activeSubmissionRequestId = null;
+                setSubmissionControlsDisabled(false);
+                generateBtn.disabled = false;
+                generateBtn.innerText = 'Generate Broadcast Pass';
+                statusBox.style.color = '#d9534f';
+                statusBox.innerText = 'This alert is already being generated. Please wait for the current request to finish.';
+                scrollToStatusBox();
+                return;
+            }
+
             if (response.ok) {
                 generateBtn.innerHTML = "Broadcast Created ✓";
+                generateBtn.disabled = true;
                 generateBtn.disabled = true;
                 showCompletedProgress();
                 playSuccessSound();
@@ -655,11 +1089,7 @@ console.log("Capacitor =", window.Capacitor);
                 statusBox.style.color = '#d9534f';
                 statusBox.innerHTML = `
                     <div style="font-weight:bold; margin-bottom:8px;">
-                        The request is taking longer than expected.
-                    </div>
-
-                    <div style="margin-bottom:12px;">
-                        Check your internet connection, then retry or cancel.
+                        The request is taking longer than expected. Please check your connection and try again.
                     </div>
 
                     <button
@@ -731,6 +1161,8 @@ console.log("Capacitor =", window.Capacitor);
             document.getElementById('broadcastForm').reset();
             compressedPhotoBase64 = "";
             isSubmitting = false;
+            activeSubmissionRequestId = null;
+            setSubmissionControlsDisabled(false);
            // let lastSavedPdfPath = "";
             //let lastSavedPdfName = "";
             clearProgressTimers();
@@ -743,6 +1175,7 @@ console.log("Capacitor =", window.Capacitor);
             if (photoClothingWarning) {
                 photoClothingWarning.classList.remove('visible');
             }
+            clearAllValidationMessages();
             photoPreviewBox.innerText = "No photo captured or selected";
             photoPreviewBox.style.backgroundImage = "none";
             photoPreviewBox.style.borderColor = "#cccccc";
@@ -760,6 +1193,8 @@ console.log("Capacitor =", window.Capacitor);
             'skinTone',
             'eyeColor',
             'addressInput',
+            'dateLastSeen',
+            'timeLastSeen',
             'parentName',
             'reportingAgency',
             'contactPhone',

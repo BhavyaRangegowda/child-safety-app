@@ -79,10 +79,25 @@
             </div>
 
             <div class="form-group">
-                <label>Last Seen / Missing From Location<span class="required-asterisk">*</span></label>
-                <input type="text" id="addressInput" required maxlength="255" placeholder="Type street name, city, mall, or venue..." autocomplete="off">
-                <div id="autocompleteDropdown" class="autocomplete-suggestions"></div>
+                <label>Last Seen Address or Location<span class="required-asterisk">*</span></label>
+                <input type="text" id="addressInput" required maxlength="255" placeholder="e.g., 221B Baker Street, London, UK" autocomplete="off">
+                <div class="field-helper">Enter the best-known address, landmark, park, school, street, suburb, city, or approximate location.</div>
+                <div id="autocompleteDropdown" class="autocomplete-suggestions" style="display:none;"></div>
             </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date Last Seen<span class="required-asterisk">*</span></label>
+                    <input type="date" id="dateLastSeen" required>
+                    <div id="dateLastSeenError" class="validation-message"></div>
+                </div>
+                <div class="form-group">
+                    <label>Time Last Seen<span class="required-asterisk">*</span></label>
+                    <input type="time" id="timeLastSeen" required>
+                    <div id="timeLastSeenError" class="validation-message"></div>
+                </div>
+            </div>
+            <div class="field-helper">Enter the local date and time at the location where the child was last seen.</div>
 
             <div class="section-divider"></div>
 
@@ -98,25 +113,30 @@
             <div class="form-row">
                 <div class="form-group">
                     <label>Primary Phone<span class="required-asterisk">*</span></label>
-                    <input type="text" id="contactPhone" required maxlength="150" placeholder="e.g., (214) 555-0199">
+                    <input type="tel" id="contactPhone" required maxlength="150" inputmode="tel" autocomplete="tel" placeholder="e.g., +1 214 555 0199 or +91 98765 43210">
+                    <div class="field-helper">Include the country code when possible so you can be contacted internationally.</div>
+                    <div id="contactPhoneError" class="validation-message"></div>
                 </div>
                 <div class="form-group">
-                    <label>Alternate Phone</label>
-                    <input type="text" id="altPhone" maxlength="150" placeholder="Backup phone number">
+                    <label>Alternate Phone (Optional)</label>
+                    <input type="tel" id="altPhone" maxlength="150" inputmode="tel" autocomplete="tel" placeholder="e.g., +44 20 7946 0958">
+                    <div class="field-helper">Optional. Enter any alternate contact number available; formatting will not block submission.</div>
+                    <div id="altPhoneError" class="validation-message"></div>
                 </div>
             </div>
 
             <div class="form-group">
                 <label>Parent Email Address</label>
-                <input type="text" id="parentEmail" maxlength="150" placeholder="guardian@example.com">
+                <input type="email" id="parentEmail" maxlength="150" inputmode="email" autocomplete="email" placeholder="e.g., guardian@example.com">
+                <div id="parentEmailError" class="validation-message"></div>
             </div>
 
             <div class="section-divider"></div>
 
             <div class="form-group">
                 <label>Clothing When Last Seen</label>
-                <textarea id="clothingDesc" maxlength="500" placeholder="Describe the clothes worn when the child was last seen..."></textarea>
-                <div class="field-helper">Describe the clothing worn when the child was last seen. It may be different from the clothing shown in the selected photo.</div>
+                <textarea id="clothingDesc" maxlength="500" placeholder="e.g., White T-shirt, blue jeans, gray hoodie"></textarea>
+                <div class="field-helper">Describe the clothing the child was wearing when last seen. Include colors, logos, or distinctive patterns if known.</div>
             </div>
 
             <div class="form-group">
